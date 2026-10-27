@@ -1,0 +1,23 @@
+job,frame,human_verdict,note
+e57_cleveland_courtney,f0,HOLD,lines on jersey barrier / median / vegetation
+e57_cleveland_courtney,f1,HOLD,lines on barrier / tree trunks
+e57_cleveland_courtney,f2,HOLD,lines on barrier / vegetation
+e57_cleveland_courtney,f3,HOLD,lines on barrier / vegetation
+e57_cleveland_courtney,f4,HOLD,doubled yellow edge
+e57_cleveland_courtney,f5,SEND,
+e57_cleveland_courtney,f6,SEND,
+e57_cleveland_courtney,f7,SEND,
+e57_cleveland_courtney,f8,SEND,
+e57_cleveland_courtney,f9,CAVEAT,NOEDGE
+e57_cleveland_courtney,f10,CAVEAT,NOEDGE
+e57_cleveland_courtney,f11,SEND,
+e57_cleveland_courtney,f12,SEND,
+e57_cleveland_courtney,f13,SEND,
+e57_cleveland_courtney,f14,SEND,
+e57_cleveland_courtney,f15,SEND,
+e57_cleveland_courtney,f16,SEND,
+e57_cleveland_courtney,f17,SEND,
+e57_cleveland_courtney,f18,SEND,
+roosevelt,f2,CAVEAT,
+roosevelt,f3,CAVEAT,
+roosevelt,f4,CAVEAT,

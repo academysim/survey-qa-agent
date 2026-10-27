@@ -1,0 +1,66 @@
+# survey-qa-agent
+
+An agent that does field QA on LiDAR-to-CAD survey drafts with **Meta Muse Spark**. It looks at each
+station's plan render and the street photos taken there, asks for more evidence when it is not sure
+(the second photo, the geometric QA flags, the next station over), and returns SEND / CAVEAT / HOLD with a
+reason. It then rolls the stations up into a verdict per frame and writes the caveat note for the client.
+
+## Built during the hackathon (Oct 26 - Nov 4, 2026)
+Everything in this repo: `survey_qa/` (manifest, agent loop, backends, spend guard, scorer, viewer),
+`run.py`, `tests/`, `data/*.csv` labels.
+
+## Pre-existing input (not part of the submission)
+The CAD drafts and review sheets (plan renders, photos, QA_flags.txt) come from our earlier
+RockyPointSurvey pipeline. They are input data only. Scans, photos and DXF files are **not** in this
+repo (see `.gitignore`).
+
+## Run
+**The survey input data is not in this repo** (client scans and photos). The code expects a drafts folder
+laid out as `<job>/_package/review_sheets/` holding `fN_staNNNNN_plan.png`, `fN_staNNNNN_photoK.jpg` and `QA_flags.txt`.
+Set `SURVEY_QA_DRAFTS` to that folder. Without it, `run.py` has nothing to review; `pytest` runs without it.
+
+    python -m venv .venv && .venv/Scripts/pip install requests pytest
+    python run.py e57_cleveland_courtney --backend fake          # zero spend
+    python run.py e57_cleveland_courtney --backend muse --max-tokens 600000 --limit 20   # ~25K tokens per station
+
+`--backend muse` refuses to start without `--max-tokens`. Before every call it estimates the cost and
+stops if the call could go past the cap. A `--max-usd` cap also needs `--usd-in/--usd-out` prices.
+Each run writes `runs/<job>_<backend>_<time>/` containing `results.jsonl` (written as it goes), `run.json`
+and `viewer.html`.
+
+## Scoring
+`data/labels.csv` holds the human verdicts per frame. `data/station_reviews.csv` holds stations a human
+re-checked, and these override the frame label. When the model is stricter than the label, the station
+goes into a "possible defect found" bucket for a person to look at instead of counting as a miss.
+(Example: f6_sta00250 was labelled SEND, but Muse flagged lines drawn on a steel truss stack. That was real.)
+
+The `fake` backend only looks at QA flag ratios and never sees pixels. It is the geometry-only reference Muse has to beat. Its
+score may be inflated if some labels were partly derived from the same QA flags.
+
+## Results (muse-spark-1.3, measured 2026-10-27)
+Frame verdict rule (a stated client-acceptance policy, not fit to data): HOLD if more than 20% of a frame's
+stations are HOLD, CAVEAT if any station is HOLD or CAVEAT, otherwise SEND. A frame with any errored station
+is UNASSESSED and not scored.
+
+| Run | Stations | Muse station agree | Muse frames | Fake (QA flags only) | Always-CAVEAT |
+|---|---|---|---|---|---|
+| cleveland, prompt v1, full job | 236 | 37.7% | 5/19 | 91.9%, 16/19 frames | 2/19 |
+| cleveland, prompt v2, full job | 236 | 58.1% | 6/19 | 91.9%, 16/19 frames | 2/19 |
+| roosevelt f2-f4, prompt v2 | 54 | 38.9% | 2/3 | 0%, 0/3 frames | **3/3** |
+
+Cleveland frame-level, prompt v2: all 5 HOLD frames caught, and no bad frame was ever passed as SEND. Every miss
+went the safe way: 8 of the 12 SEND frames came out CAVEAT, 3 came out HOLD, and the 2 CAVEAT frames came out HOLD.
+Muse today is a conservative reviewer, not a better one than the geometry checks.
+
+**How to read this (please do):**
+- We revised aggregation after inspecting the Roosevelt predictions and labels. Roosevelt was held out for prompt
+  development but is not an independent test of the revised pipeline. The original aggregation agrees on 0/3 frames
+  and the revised one on 2/3. All three labels are CAVEAT, so an always-CAVEAT baseline scores 3/3.
+- Prompt v2 was written after reading v1's mistakes on cleveland, so cleveland informed prompt tuning.
+  These results do not establish generalization.
+- Labels are per frame. Station agreement treats the frame label as every station's truth, which is not right
+  (a CAVEAT frame has good stations too), so frame agreement is the fairer number.
+- The fake reference may be inflated if some labels were partly derived from the same QA flags.
+- Cost: ~25K tokens per station with prompt v2 (2.7 calls on average); the full 236-station job was 5.92M tokens.
+  In dollars, about $0.0017 per 1K tokens on our Meta billing (blended in+out, read from the account balance,
+  not a published price), so roughly $10 for the job.

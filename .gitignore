@@ -1,0 +1,29 @@
+# Survey data (scans, photos, DXF) never goes in git - repo is public.
+*.png
+*.jpg
+*.jpeg
+*.dxf
+*.dwg
+*.e57
+*.las
+*.laz
+runs/
+out/
+manifest*.json
+.venv/
+__pycache__/
+.env
+.env.*
+*.tif
+*.tiff
+*.ply
+*.pdf
+*.webp
+*.pts
+*.xyz
+QA_flags.txt
+README.txt
+
+# Internal handoff notes stay local
+RESTART-*.md
+DEMO-SCRIPT-*.md
