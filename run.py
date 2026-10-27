@@ -1,7 +1,8 @@
 """Run the survey QA agent on one job.
 
   python run.py e57_cleveland_courtney --backend fake
-  python run.py e57_cleveland_courtney --backend muse --max-tokens 250000 --limit 20
+  python run.py e57_cleveland_courtney --backend muse --max-tokens 600000 --limit 20
+  python run.py e57_curlew --backend hybrid --max-tokens 2000000
 
 The muse backend refuses to start without --max-tokens, reserves max_output_tokens before every call, charges estimates for failed or uncounted calls, and stops the run.
 """
@@ -13,6 +14,7 @@ import time
 from survey_qa.agent import review_job
 from survey_qa.backends import FakeBackend, MuseSparkBackend
 from survey_qa.budget import Budget
+from survey_qa.hybrid import review_station_hybrid
 from survey_qa.manifest import build
 from survey_qa.score import score
 from survey_qa.viewer import render
@@ -21,7 +23,7 @@ from survey_qa.viewer import render
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("job")
-    ap.add_argument("--backend", choices=["fake", "muse"], default="fake")
+    ap.add_argument("--backend", choices=["fake", "muse", "hybrid"], default="fake")
     ap.add_argument("--model", default="muse-spark-1.3")
     ap.add_argument("--max-tokens", type=int)
     ap.add_argument("--max-usd", type=float)
@@ -31,13 +33,13 @@ def main():
     ap.add_argument("--only", nargs="*", help="station ids or frames, e.g. f0 f6_sta00250")
     a = ap.parse_args()
 
-    if a.backend == "muse":
+    if a.backend in ("muse", "hybrid"):
         if not a.max_tokens:
             ap.error("--backend muse requires --max-tokens (spend guard)")
-    name = a.model if a.backend == "muse" else "fake"
+    name = {"muse": a.model, "hybrid": f"hybrid-{a.model}"}.get(a.backend, "fake")
     d = f"runs/{a.job}_{name}_{time.strftime('%Y%m%d-%H%M%S')}"
     os.makedirs(d, exist_ok=True)
-    if a.backend == "muse":
+    if a.backend in ("muse", "hybrid"):
         budget = Budget(a.max_tokens, a.max_usd, a.usd_in, a.usd_out, ledger=f"{d}/spend_ledger.jsonl")
         backend = MuseSparkBackend(a.model, budget)
     else:
@@ -53,7 +55,8 @@ def main():
         print(f"{r['station_id']:14} {r['verdict']:6} {r['evidence']} {r['reason'][:70]}")
 
     try:
-        run = review_job(man, backend, budget, a.limit, a.only, on_result)
+        run = review_job(man, backend, budget, a.limit, a.only, on_result,
+                         reviewer=review_station_hybrid if a.backend == "hybrid" else None)
     except BaseException as e:  # anything unexpected still leaves run.json with the spend so far
         json.dump({"job": a.job, "budget": budget.summary(), "stopped": f"crashed: {e!r}"},
                   open(f"{d}/run.json", "w"), indent=1)

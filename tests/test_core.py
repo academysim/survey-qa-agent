@@ -304,3 +304,48 @@ def test_missing_complete_flag_not_scored():
     s = score({"job": "j", "results": [], "frames": [{"frame": "f0", "verdict": "HOLD"}]},
               labels={("j", "f0"): "HOLD"}, reviews={})
     assert s["frames_labelled"] == 0
+
+
+# --- hybrid reviewer (rule fixed before any held-out run) ---
+from survey_qa import hybrid
+from survey_qa.hybrid import geometry_verdict, review_station_hybrid
+
+
+def hst(flagged, sid="f0_sta00000"):
+    s = dict(man()["stations"][0], station_id=sid)
+    s["qa_flags"] = {"bins": 100, "flagged": flagged, "counts": {"ZOFF": flagged}}
+    return s
+
+
+def test_geometry_thresholds():
+    assert [geometry_verdict(hst(n))[0] for n in (29, 30, 59, 60)] == ["SEND", "CAVEAT", "CAVEAT", "HOLD"]
+
+
+def test_hybrid_clean_unaudited_makes_no_call(monkeypatch):
+    monkeypatch.setattr(hybrid, "audited", lambda s: False)
+    b = Scripted([])
+    r = review_station_hybrid(hst(5), man(), b)
+    assert r["verdict"] == "SEND" and r["decided_by"] == "geometry" and b.seen == []
+
+
+def test_hybrid_flagged_muse_decides():
+    r = review_station_hybrid(hst(70), man(), Scripted([{"verdict": "SEND", "confidence": 0.9, "reason": "noise"}]))
+    assert r["verdict"] == "SEND" and r["decided_by"] == "muse_adjudicated"
+
+
+def test_hybrid_audit_escalates_only_when_confident(monkeypatch):
+    monkeypatch.setattr(hybrid, "audited", lambda s: True)
+    hi = review_station_hybrid(hst(5), man(), Scripted([{"verdict": "HOLD", "confidence": 0.85, "reason": "truss"}]))
+    lo = review_station_hybrid(hst(5), man(), Scripted([{"verdict": "HOLD", "confidence": 0.6, "reason": "maybe"}]))
+    assert hi["verdict"] == "HOLD" and hi["decided_by"] == "muse_audit_escalated"
+    assert lo["verdict"] == "SEND" and lo["decided_by"] == "muse_audit_confirmed"
+
+
+def test_hybrid_error_stays_error():
+    r = review_station_hybrid(hst(70), man(), Scripted([parse_reply("garbage")]))
+    assert r["error"] and r["decided_by"] == "error"
+
+
+def test_audit_sample_is_about_one_in_three():
+    n = sum(hybrid.audited({"job": "j", "station_id": f"s{i}"}) for i in range(3000))
+    assert 850 < n < 1150

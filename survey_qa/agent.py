@@ -120,7 +120,8 @@ def rollup(results):
     return out
 
 
-def review_job(manifest, backend, budget=None, limit=None, only=None, on_result=None):
+def review_job(manifest, backend, budget=None, limit=None, only=None, on_result=None, reviewer=None):
+    reviewer = reviewer or review_station
     stations = manifest["stations"]
     if only:
         stations = [s for s in stations if s["station_id"] in only or s["frame"] in only]
@@ -129,7 +130,7 @@ def review_job(manifest, backend, budget=None, limit=None, only=None, on_result=
     results, stopped = [], None
     for s in stations:
         try:
-            r = review_station(s, manifest, backend, budget)
+            r = reviewer(s, manifest, backend, budget)
         except BudgetExceeded as e:
             stopped = str(e)
             break

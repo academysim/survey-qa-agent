@@ -37,6 +37,17 @@ goes into a "possible defect found" bucket for a person to look at instead of co
 The `fake` backend only looks at QA flag ratios and never sees pixels. It is the geometry-only reference Muse has to beat. Its
 score may be inflated if some labels were partly derived from the same QA flags.
 
+## Hybrid reviewer (pre-registered)
+`--backend hybrid`: the free geometry check decides first and Muse is only called where it can change the answer.
+Geometry CAVEAT/HOLD stations go to Muse, whose verdict stands. Geometry SEND stations skip the model, except a
+fixed 1-in-3 audit sample where Muse may only escalate, at confidence >= 0.8. The exact rule is in
+`survey_qa/hybrid.py` and was committed before it was run on any held-out station.
+
+## Held-out labels
+`python -m survey_qa.label <jobs...>` builds a blinded labelling page: stations from jobs the agent was never
+tuned on, sampled by QA-flag ratio band (not by model output), with no model verdict shown. Labels go in
+`data/station_labels_<name>.csv`.
+
 ## Results (muse-spark-1.3, measured 2026-10-27)
 Frame verdict rule (a stated client-acceptance policy, not fit to data): HOLD if more than 20% of a frame's
 stations are HOLD, CAVEAT if any station is HOLD or CAVEAT, otherwise SEND. A frame with any errored station
