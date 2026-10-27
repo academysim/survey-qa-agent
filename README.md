@@ -19,7 +19,7 @@ repo (see `.gitignore`).
 laid out as `<job>/_package/review_sheets/` holding `fN_staNNNNN_plan.png`, `fN_staNNNNN_photoK.jpg` and `QA_flags.txt`.
 Set `SURVEY_QA_DRAFTS` to that folder. Without it, `run.py` has nothing to review; `pytest` runs without it.
 
-    python -m venv .venv && .venv/Scripts/pip install requests pytest
+    python -m venv .venv && .venv/Scripts/pip install requests pytest pillow
     python run.py e57_cleveland_courtney --backend fake          # zero spend
     python run.py e57_cleveland_courtney --backend muse --max-tokens 600000 --limit 20   # ~25K tokens per station
 
@@ -42,6 +42,12 @@ score may be inflated if some labels were partly derived from the same QA flags.
 Geometry CAVEAT/HOLD stations go to Muse, whose verdict stands. Geometry SEND stations skip the model, except a
 fixed 1-in-3 audit sample where Muse may only escalate, at confidence >= 0.8. The exact rule is in
 `survey_qa/hybrid.py` and was committed before it was run on any held-out station.
+
+## Suggested fixes and client report
+On a CAVEAT or HOLD the agent also names the one edit a drafter should make first (`fix`: action, layer, where in
+the plan), in the same reply, so it costs no extra call. `python -m survey_qa.report runs/<run>/results.jsonl`
+writes a single self-contained HTML report per job (frame table, client caveats, every flagged station with its
+plan and photo, reason and suggested fix) that prints cleanly to PDF. Needs `pip install pillow`.
 
 ## Held-out labels
 `python -m survey_qa.label <jobs...>` builds a blinded labelling page: stations from jobs the agent was never

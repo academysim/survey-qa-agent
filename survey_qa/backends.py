@@ -33,7 +33,9 @@ You may ask for ONE more piece of evidence per turn if you are not sure. Tools:
 {tools}
 Reply ONLY with JSON, one of:
 {{"tool": "<tool name>", "why": "<what you need to check>"}}
-{{"verdict": "SEND"|"CAVEAT"|"HOLD", "confidence": <0..1>, "reason": "<one sentence>", "client_note": "<caveat text for the client, or empty>"}}
+{{"verdict": "SEND"|"CAVEAT"|"HOLD", "confidence": <0..1>, "reason": "<one sentence>", "client_note": "<caveat text for the client, or empty>",
+ "fix": {{"action": "delete"|"redraw"|"shift"|"merge", "layer": "<layer name from the plan, e.g. PMRK, PavtAsphalt, CG>", "where": "<where in the PLAN, e.g. north side, upper-left third>"}}}}
+Give "fix" only with CAVEAT or HOLD: the one edit a drafter should make first. Omit it for SEND.
 SEND = ready for the client. CAVEAT = usable, but a specific limitation must be stated. HOLD = wrong, fix before sending."""
 
 

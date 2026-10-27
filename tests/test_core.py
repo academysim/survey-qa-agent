@@ -349,3 +349,11 @@ def test_hybrid_error_stays_error():
 def test_audit_sample_is_about_one_in_three():
     n = sum(hybrid.audited({"job": "j", "station_id": f"s{i}"}) for i in range(3000))
     assert 850 < n < 1150
+
+
+def test_fix_kept_only_on_problem_verdicts():
+    fix = {"action": "delete", "layer": "PMRK", "where": "north side"}
+    hold = review_station(man()["stations"][0], man(), Scripted([{"verdict": "HOLD", "reason": "r", "fix": fix}]))
+    send = review_station(man()["stations"][0], man(), Scripted([{"verdict": "SEND", "reason": "r", "fix": fix}]))
+    junk = review_station(man()["stations"][0], man(), Scripted([{"verdict": "HOLD", "reason": "r", "fix": "redo it"}]))
+    assert hold["fix"] == fix and send["fix"] is None and junk["fix"] is None

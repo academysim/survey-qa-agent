@@ -81,6 +81,8 @@ def review_station(station, manifest, backend, budget=None):
     return {"job": station["job"], "frame": station["frame"], "station_id": station["station_id"],
             "backend": backend.name, "verdict": reply["verdict"], "confidence": reply.get("confidence"),
             "reason": reply.get("reason", ""), "client_note": reply.get("client_note", ""),
+            # Suggested edit for the drafter; only kept on a CAVEAT/HOLD and only if it is a dict.
+            "fix": reply.get("fix") if reply["verdict"] != "SEND" and isinstance(reply.get("fix"), dict) else None,
             "evidence": [e["kind"] for e in evidence],
             "steps": [{"tool": s["reply"].get("tool"), "why": s["reply"].get("why"), "usage": s["usage"]}
                       for s in steps],
