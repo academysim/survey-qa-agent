@@ -53,11 +53,12 @@ const f=D.st.findIndex(s=>!L[s.key]);i=f<0?0:f;show();
 """
 
 
-def sample(jobs, per_job, seed=1027):
+def sample(jobs, per_job, seed=1027, exclude=()):
     rng = random.Random(seed)
     out = []
     for job in jobs:
-        st = [s for s in build(job)["stations"] if s["plan"] and s["photos"]]
+        st = [s for s in build(job)["stations"] if s["plan"] and s["photos"]
+              and f"{job} {s['station_id']}" not in exclude]
         ratio = lambda s: (s["qa_flags"] or {}).get("flagged", 0) / max((s["qa_flags"] or {}).get("bins", 0), 1)
         st.sort(key=ratio)
         # Three flag-ratio bands (low / mid / high), equal draws from each: blind to any model output.
@@ -96,8 +97,11 @@ if __name__ == "__main__":
     ap.add_argument("--per-job", type=int, default=15)
     ap.add_argument("--name", default="heldout1")
     ap.add_argument("--out", default="out/label.html")
+    ap.add_argument("--exclude", help="stations file from an earlier sample; never re-sampled")
+    ap.add_argument("--seed", type=int, default=1027)
     a = ap.parse_args()
-    st = sample(a.jobs, a.per_job)
+    ex = set(open(a.exclude).read().splitlines()) if a.exclude else set()
+    st = sample(a.jobs, a.per_job, a.seed, ex)
     open(os.path.join(os.path.dirname(a.out) or ".", f"{a.name}_stations.txt"), "w").write(
         "\n".join(f"{s['job']} {s['station_id']}" for s in st))
     print(render(st, a.name, a.out), len(st), "stations")

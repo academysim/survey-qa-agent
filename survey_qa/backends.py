@@ -18,16 +18,27 @@ TOOLS = {
     "neighbour": "the plan render of the adjacent station in the same frame",
 }
 
+# v3 2026-10-27: defect checklist from the surveyor (Malik) after held-out labelling; replaces v2's
+# "foliage in photos is occlusion" rule, which excused real canopy/grass defects.
+PROMPT_VERSION = "v3"
 SYSTEM = """You are a field-QA reviewer for CAD survey drafts made from mobile LiDAR.
-PLAN images: drafted linework over the scan at one station (RED = reference draft, CYAN = our draft).
-PHOTO images: street-level photos from the survey vehicle at that station (CYAN = our draft projected).
-Decide whether our drafted lines sit on real pavement markings, pavement edges and curbs, or on wrong
-features (jersey barrier, median, tree trunks, vegetation, shadows, construction, doubled lines).
-Judge WHERE a line sits from the PLAN view. In PHOTOS a ground line is projected flat onto the image, so it
-always crosses cars, people, poles, trunks or foliage standing between the camera and the road: that is
-occlusion, not a drafting error. Use photos to identify what a feature is, not to locate the line.
-Short ticks, gaps and a minority of flagged bins are normal; HOLD only for linework that is clearly on the
-wrong feature or clearly broken in the PLAN, CAVEAT for a real but limited problem.
+PLAN images: drafted linework over the scan at one station (RED = reference draft if present, CYAN = our draft).
+PHOTO images: street-level photos from the survey vehicle at that station (CYAN = our draft projected in 3D).
+Only ground features are mapped: pavement markings (lane lines, crosswalks, gore areas and their cross-hatching),
+pavement edges, curbs, medians. Lines are drawn at ground level and must be accurate horizontally.
+These are drafting DEFECTS (a surveyor's checklist) - look for each one:
+- lines in grass, bushes or landscaping (grass is never mapped)
+- lines in trees: a projected line hanging mid-air in branches or canopy means the draft picked up the tree
+  (only a trunk's base could ever be on the ground)
+- a line that climbs or jumps in elevation near a pole, utility, sign or plaza sign instead of staying on the road
+- lane lines that start and then stop for no reason, or missing lane lines
+- tangles or jumbles of short lines where cars were, instead of one clean lane line
+- gore areas and their cross-hatching not traced, crosswalks with extra or missing lines
+- median ends not following the real shape (e.g. a bullnose drawn as straight stubs), doubled or squiggly edges
+A ground line passing BEHIND a car or trunk at ground level in a photo is fine; a line drawn ON the car, or up
+in the branches, is a defect. Use the PLAN to see where lines sit and the PHOTOS to see what they sit on.
+HOLD if any of these defects is clearly present; CAVEAT only for a single small, isolated one; SEND only if
+the linework is clean.
 
 You may ask for ONE more piece of evidence per turn if you are not sure. Tools:
 {tools}
@@ -111,7 +122,8 @@ class MuseSparkBackend:
     def __init__(self, model="muse-spark-1.3", budget=None):
         if budget is None:
             raise ValueError("MuseSparkBackend needs a Budget: it never sends an unguarded request")
-        self.name, self.budget = model, budget
+        self.name, self.budget = f"{model}+{PROMPT_VERSION}", budget
+        self.model = model
 
     def build_content(self, station, evidence, allowed_tools):
         tools = "\n".join(f"- {t}: {TOOLS[t]}" for t in allowed_tools) or "- (none left; you must give a verdict)"
@@ -128,7 +140,7 @@ class MuseSparkBackend:
         import requests
         try:
             r = requests.post(self.URL, headers={"Authorization": f"Bearer {_key()}"}, timeout=180,
-                              json={"model": self.name, "input": [{"role": "user", "content": content}],
+                              json={"model": self.model, "input": [{"role": "user", "content": content}],
                                     "max_output_tokens": MAX_OUTPUT_TOKENS, "reasoning": {"effort": REASONING_EFFORT},
                                     "stream": False})
             r.raise_for_status()

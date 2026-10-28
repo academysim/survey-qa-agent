@@ -357,3 +357,9 @@ def test_fix_kept_only_on_problem_verdicts():
     send = review_station(man()["stations"][0], man(), Scripted([{"verdict": "SEND", "reason": "r", "fix": fix}]))
     junk = review_station(man()["stations"][0], man(), Scripted([{"verdict": "HOLD", "reason": "r", "fix": "redo it"}]))
     assert hold["fix"] == fix and send["fix"] is None and junk["fix"] is None
+
+
+def test_api_gets_bare_model_id_and_runs_record_prompt_version(monkeypatch):
+    b, bud, sent = muse(monkeypatch, reply({"input_tokens": 500, "output_tokens": 50}))
+    r = review_station(man()["stations"][0], man(), b, bud)
+    assert sent[0]["model"] == "muse-spark-1.3" and r["backend"].endswith("+v3")
