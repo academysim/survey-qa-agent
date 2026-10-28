@@ -82,6 +82,13 @@ class Budget:
             raise UsageMissing(f"call returned no usable token counts {usage!r}; charged estimate and stopped")
         self.record(usage)
         self._log("actual", {k: usage[k] for k in ("input_tokens", "output_tokens")})
+        est = self.last_estimate or {}
+        if usage["input_tokens"] > est.get("input_tokens", 0) or usage["output_tokens"] > est.get("output_tokens", 0):
+            self._log("overrun", {"actual": usage["input_tokens"] + usage["output_tokens"],
+                                  "reserved": sum(est.values())})
+        if self.used_in + self.used_out > self.max_tokens:
+            raise self.stop(f"token cap {self.max_tokens} passed by a call larger than its reservation: "
+                            f"used {self.used_in + self.used_out}")
 
     def record_failed(self):
         """A request that errored or timed out may still be billed: charge the estimate."""

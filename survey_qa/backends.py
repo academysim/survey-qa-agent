@@ -18,7 +18,7 @@ TOOLS = {
     "neighbour": "the plan render of the adjacent station in the same frame",
 }
 
-# v3 2026-10-27: defect checklist from the surveyor (Malik) after held-out labelling; replaces v2's
+# v3 2026-10-27: defect checklist from the surveyor after held-out labelling; replaces v2's
 # "foliage in photos is occlusion" rule, which excused real canopy/grass defects.
 PROMPT_VERSION = "v4"  # v4: + parking stops, partial crosswalks/gores, asphalt-to-face flow line
 SYSTEM = """You are a field-QA reviewer for CAD survey drafts made from mobile LiDAR.

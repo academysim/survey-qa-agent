@@ -363,3 +363,13 @@ def test_api_gets_bare_model_id_and_runs_record_prompt_version(monkeypatch):
     b, bud, sent = muse(monkeypatch, reply({"input_tokens": 500, "output_tokens": 50}))
     r = review_station(man()["stations"][0], man(), b, bud)
     assert sent[0]["model"] == "muse-spark-1.3" and r["backend"].endswith("+" + __import__("survey_qa.backends").backends.PROMPT_VERSION)
+
+
+def test_overrun_past_cap_stops_run():
+    b = Budget(max_tokens=10000)
+    b.check(1, 0)
+    with pytest.raises(BudgetExceeded):
+        b.record_real({"input_tokens": 20000, "output_tokens": 10})
+    assert b.stopped
+    with pytest.raises(BudgetExceeded):
+        b.check(1, 0)

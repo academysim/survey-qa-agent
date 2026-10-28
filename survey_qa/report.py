@@ -58,6 +58,9 @@ def render(results, out, job=None):
     sizes = {}
     for s in st.values():
         sizes[s["frame"]] = sizes.get(s["frame"], 0) + 1
+    for f in frames:  # a partly reviewed frame gets no client verdict
+        if f["stations"] != sizes.get(f["frame"]):
+            f["verdict"] = "UNASSESSED"
     counts = {v: sum(f["verdict"] == v for f in frames) for v in ("SEND", "CAVEAT", "HOLD", "UNASSESSED")}
     partial = [f["frame"] for f in frames if f["stations"] != sizes.get(f["frame"])]
     by_frame = {}

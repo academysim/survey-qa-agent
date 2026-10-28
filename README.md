@@ -21,10 +21,11 @@ Set `SURVEY_QA_DRAFTS` to that folder. Without it, `run.py` has nothing to revie
 
     python -m venv .venv && .venv/Scripts/pip install requests pytest pillow
     python run.py e57_cleveland_courtney --backend fake          # zero spend
-    python run.py e57_cleveland_courtney --backend muse --max-tokens 600000 --limit 20   # ~25K tokens per station
+    python run.py e57_cleveland_courtney --backend muse --max-tokens 600000 --limit 20   # ~17K tokens per station (prompt v4)
 
 `--backend muse` refuses to start without `--max-tokens`. Before every call it estimates the cost and
-stops if the call could go past the cap. A `--max-usd` cap also needs `--usd-in/--usd-out` prices.
+stops if the call could go past the cap. Token estimates are padded guesses, so one call can still
+run over its reservation; the ledger logs that as an overrun and the run stops at once if the cap was passed. A `--max-usd` cap also needs `--usd-in/--usd-out` prices.
 Each run writes `runs/<job>_<backend>_<time>/` containing `results.jsonl` (written as it goes), `run.json`
 and `viewer.html`.
 
@@ -63,9 +64,23 @@ tuned on, sampled by QA-flag ratio band (not by model output), with no model ver
 
 The two heldout2 misses are scope gaps in the checklist: parking stops drafted as lines, and a half-drawn
 crosswalk with an untraced gore. v3 is strict: on heldout1 it held 8 of 10 stations a surveyor would send, so it is
-a conservative reviewer, not a replacement for one. heldout2 cost about 0.86M tokens for 62 stations.
+a conservative reviewer, not a replacement for one. heldout2 cost about 0.86M tokens for 62 stations. Both held-out sets were scored with prompt v3. The surveyor
+re-checked the heldout1 "false alarms" and says those stations were also missing linework, so they may be real
+defects. Prompt v4 (parking stops, partly drawn crosswalks and gores, no flow line where asphalt meets the curb
+face) was written AFTER heldout2 was scored, so v4 has no clean held-out number yet.
 
-## Results (muse-spark-1.3, measured 2026-10-27)
+### Full held-out jobs, prompt v4 (no frame labels; volume and cost only)
+
+| Job | Stations | HOLD / CAVEAT / SEND | Errors |
+|---|---|---|---|
+| largo | 115 | 104 / 4 / 7 | 0 |
+| e57_curlew | 160 | 136 / 14 / 10 | 0 |
+| pasco789 | 248 | 220 / 15 / 13 | 0 |
+| e57_strd50 | 334 | 292 / 20 / 22 | 0 |
+
+857 stations, about 14.65M tokens (~17K per station incl. evidence calls, ~1.9 calls each), about $25.
+
+## Earlier results, prompts v1/v2 (historical, measured 2026-10-27)
 Frame verdict rule (a stated client-acceptance policy, not fit to data): HOLD if more than 20% of a frame's
 stations are HOLD, CAVEAT if any station is HOLD or CAVEAT, otherwise SEND. A frame with any errored station
 is UNASSESSED and not scored.
