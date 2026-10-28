@@ -54,6 +54,17 @@ plan and photo, reason and suggested fix) that prints cleanly to PDF. Needs `pip
 tuned on, sampled by QA-flag ratio band (not by model output), with no model verdict shown. Labels go in
 `data/station_labels_<name>.csv`.
 
+### Held-out stations, prompt v3 (surveyor defect checklist)
+
+| Set | Stations (human) | Muse v3 caught | Geometry-only caught | Muse v3 false alarms |
+|---|---|---|---|---|
+| heldout1 (DEV: v3 checklist written from these notes) | 50 HOLD, 10 SEND | 47/50 | 16/50 | 8/10 |
+| heldout2 (clean: new jobs phillippe, sr583 + 4 others, never seen) | 62 HOLD, 0 SEND | **60/62** (55 HOLD, 5 CAVEAT) | 42/62 (10 HOLD, 32 CAVEAT) | not measurable (no clean stations) |
+
+The two heldout2 misses are scope gaps in the checklist: parking stops drafted as lines, and a half-drawn
+crosswalk with an untraced gore. v3 is strict: on heldout1 it held 8 of 10 stations a surveyor would send, so it is
+a conservative reviewer, not a replacement for one. heldout2 cost about 0.86M tokens for 62 stations.
+
 ## Results (muse-spark-1.3, measured 2026-10-27)
 Frame verdict rule (a stated client-acceptance policy, not fit to data): HOLD if more than 20% of a frame's
 stations are HOLD, CAVEAT if any station is HOLD or CAVEAT, otherwise SEND. A frame with any errored station
