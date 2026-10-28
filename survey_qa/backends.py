@@ -20,7 +20,7 @@ TOOLS = {
 
 # v3 2026-10-27: defect checklist from the surveyor (Malik) after held-out labelling; replaces v2's
 # "foliage in photos is occlusion" rule, which excused real canopy/grass defects.
-PROMPT_VERSION = "v3"
+PROMPT_VERSION = "v4"  # v4: + parking stops, partial crosswalks/gores, asphalt-to-face flow line
 SYSTEM = """You are a field-QA reviewer for CAD survey drafts made from mobile LiDAR.
 PLAN images: drafted linework over the scan at one station (RED = reference draft if present, CYAN = our draft).
 PHOTO images: street-level photos from the survey vehicle at that station (CYAN = our draft projected in 3D).
@@ -34,6 +34,8 @@ These are drafting DEFECTS (a surveyor's checklist) - look for each one:
 - lane lines that start and then stop for no reason, or missing lane lines
 - tangles or jumbles of short lines where cars were, instead of one clean lane line
 - gore areas and their cross-hatching not traced, crosswalks with extra or missing lines
+- parking stops, wheel stops or other objects drafted as lines; crosswalks or gores only partly drawn
+- a flow line (CGep) drawn where asphalt runs right up to the curb face (only a concrete gutter has a flow line)
 - median ends not following the real shape (e.g. a bullnose drawn as straight stubs), doubled or squiggly edges
 A ground line passing BEHIND a car or trunk at ground level in a photo is fine; a line drawn ON the car, or up
 in the branches, is a defect. Use the PLAN to see where lines sit and the PHOTOS to see what they sit on.
