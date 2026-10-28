@@ -107,6 +107,12 @@ held out for v4.
 
 857 stations, about 14.65M tokens (~17K per station incl. evidence calls, ~1.9 calls each), about $25.
 
+### Full job, prompt v5 (defect boxes; not held out)
+largo re-run with v5: 115 stations, 107 HOLD / 5 CAVEAT / 3 SEND, 0 errors, 217 calls, 1.85M tokens
+(~16K per station, about $3). 106 of 112 flagged stations came back with at least one box (228 defects:
+198 major, 19 minor, 11 critical). Boxes were checked by eye on a 20-station pilot, not scored against labels.
+Severity is mostly "major", so it does little to reorder the queue yet.
+
 ## Earlier results, prompts v1/v2 (historical, measured 2026-10-27)
 Frame verdict rule (a stated client-acceptance policy, not fit to data): HOLD if more than 20% of a frame's
 stations are HOLD, CAVEAT if any station is HOLD or CAVEAT, otherwise SEND. A frame with any errored station
