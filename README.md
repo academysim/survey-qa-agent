@@ -6,7 +6,7 @@ station's plan render and the street photos taken there, asks for more evidence 
 reason. It then rolls the stations up into a verdict per frame and writes the caveat note for the client.
 
 ## Built during the hackathon (Oct 26 - Nov 4, 2026)
-Everything in this repo: `survey_qa/` (manifest, agent loop, backends, spend guard, scorer, viewer),
+Everything in this repo: `survey_qa/` (manifest, agent loop, backends, spend guard, scorer, viewer, report, replay),
 `run.py`, `tests/`, `data/*.csv` labels.
 
 ## Pre-existing input (not part of the submission)
@@ -21,7 +21,7 @@ Set `SURVEY_QA_DRAFTS` to that folder. Without it, `run.py` has nothing to revie
 
     python -m venv .venv && .venv/Scripts/pip install requests pytest pillow
     python run.py e57_cleveland_courtney --backend fake          # zero spend
-    python run.py e57_cleveland_courtney --backend muse --max-tokens 600000 --limit 20   # ~17K tokens per station (prompt v4)
+    python run.py e57_cleveland_courtney --backend muse --max-tokens 600000 --limit 20   # ~21K tokens per station (prompt v5)
 
 `--backend muse` refuses to start without `--max-tokens`. Before every call it estimates the cost and
 stops if the call could go past the cap. Token estimates are padded guesses, so one call can still
@@ -49,6 +49,31 @@ On a CAVEAT or HOLD the agent also names the one edit a drafter should make firs
 the plan), in the same reply, so it costs no extra call. `python -m survey_qa.report runs/<run>/results.jsonl`
 writes a single self-contained HTML report per job (frame table, client caveats, every flagged station with its
 plan and photo, reason and suggested fix) that prints cleanly to PDF. Needs `pip install pillow`.
+
+### Defect boxes and severity (prompt v5)
+From v5 the same verdict reply also lists each defect: `{"class", "severity": minor|major|critical, "image", "box"}`.
+`class` is one of the surveyor's checklist classes (grass, canopy, elevation_jump, lane_cutoff, car_jumble, gore,
+crosswalk, parking_stop, flow_line, median_end, other), `image` indexes the images the model saw, and `box` is
+`[x0, y0, x1, y1]` as fractions of that image. Boxes are validated before use: out-of-range values are clamped,
+and boxes that are malformed, empty or point at an image the model never saw are dropped (`parse_defects`).
+The frame roll-up does not use them; they drive the report and the work queue.
+
+The report draws the boxes in red on the plan and photos, lists stations worst first (HOLD, then severity,
+then confidence) and opens with a defect-class bar chart and a per-frame strip of station verdicts.
+
+### Drafter work queue
+The report groups HOLD/CAVEAT stations by defect class, with a count, the station list and the standard
+fix for that class, and also saves it as `workqueue_<job>.csv`, so a drafter works one defect type at a time
+across the whole job. Results from before v5 have no `defects` field, so their classes are mapped from the
+reason text by keyword. That mapping is rough; the model's own classes replace it from v5 on.
+
+### Job dashboard and agent replay
+    python -m survey_qa.report --index out/index.html runs/*/results.jsonl   # one row per job, totals, links
+    python -m survey_qa.trace runs/<run>/results.jsonl out/trace_<job>.html   # step through the agent's turns
+
+The replay page picks a station and shows each turn: what the model looked at, which extra evidence it asked
+for and why, then the verdict, the fix and the defect boxes. It replays recorded results, so no API key is
+ever in a browser.
 
 ## Held-out labels
 `python -m survey_qa.label <jobs...>` builds a blinded labelling page: stations from jobs the agent was never

@@ -35,9 +35,11 @@ def review_station_hybrid(station, manifest, backend, budget=None):
     if g == "SEND" and not audited(station):
         return base | {"verdict": "SEND", "confidence": None, "decided_by": "geometry",
                        "reason": f"only {ratio:.0%} of bins flagged; not in audit sample", "client_note": "",
-                       "evidence": ["qa_flags"], "steps": [], "stopped": None, "error": False, "fix": None}
+                       "evidence": ["qa_flags"], "steps": [], "stopped": None, "error": False, "fix": None,
+                       "images": [], "defects": []}
     r = review_station(station, manifest, backend, budget)
-    out = base | {k: r[k] for k in ("confidence", "reason", "client_note", "fix", "evidence", "steps", "stopped", "error")}
+    out = base | {k: r[k] for k in ("confidence", "reason", "client_note", "fix", "evidence", "images", "defects", "steps",
+                                     "stopped", "error")}
     if r["error"]:
         return out | {"verdict": r["verdict"], "decided_by": "error"}
     if g != "SEND":
@@ -45,4 +47,4 @@ def review_station_hybrid(station, manifest, backend, budget=None):
     if RANK[r["verdict"]] > RANK["SEND"] and (r["confidence"] or 0) >= ESCALATE_CONF:
         return out | {"verdict": r["verdict"], "decided_by": "muse_audit_escalated"}
     return out | {"verdict": "SEND", "decided_by": "muse_audit_confirmed",
-                  "reason": f"geometry SEND; audit: {r['reason']}", "fix": None}
+                  "reason": f"geometry SEND; audit: {r['reason']}", "fix": None, "defects": []}

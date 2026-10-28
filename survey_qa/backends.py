@@ -20,7 +20,11 @@ TOOLS = {
 
 # v3 2026-10-27: defect checklist from the surveyor after held-out labelling; replaces v2's
 # "foliage in photos is occlusion" rule, which excused real canopy/grass defects.
-PROMPT_VERSION = "v4"  # v4: + parking stops, partial crosswalks/gores, asphalt-to-face flow line
+PROMPT_VERSION = "v5"  # v4: + parking stops, partial crosswalks/gores, asphalt-to-face flow line
+# v5: + "defects" list with class, severity and a box per defect (for the report and the drafter queue)
+DEFECT_CLASSES = ("grass", "canopy", "elevation_jump", "lane_cutoff", "car_jumble", "gore", "crosswalk",
+                  "parking_stop", "flow_line", "median_end", "other")
+SEVERITIES = ("minor", "major", "critical")
 SYSTEM = """You are a field-QA reviewer for CAD survey drafts made from mobile LiDAR.
 PLAN images: drafted linework over the scan at one station (RED = reference draft if present, CYAN = our draft).
 PHOTO images: street-level photos from the survey vehicle at that station (CYAN = our draft projected in 3D).
@@ -47,9 +51,43 @@ You may ask for ONE more piece of evidence per turn if you are not sure. Tools:
 Reply ONLY with JSON, one of:
 {{"tool": "<tool name>", "why": "<what you need to check>"}}
 {{"verdict": "SEND"|"CAVEAT"|"HOLD", "confidence": <0..1>, "reason": "<one sentence>", "client_note": "<caveat text for the client, or empty>",
- "fix": {{"action": "delete"|"redraw"|"shift"|"merge", "layer": "<layer name from the plan, e.g. PMRK, PavtAsphalt, CG>", "where": "<where in the PLAN, e.g. north side, upper-left third>"}}}}
+ "fix": {{"action": "delete"|"redraw"|"shift"|"merge", "layer": "<layer name from the plan, e.g. PMRK, PavtAsphalt, CG>", "where": "<where in the PLAN, e.g. north side, upper-left third>"}},
+ "defects": [{{"class": "<one of {classes}>", "severity": "minor"|"major"|"critical", "image": <index of the image it is in, 0 = first image shown>, "box": [x0, y0, x1, y1]}}]}}
 Give "fix" only with CAVEAT or HOLD: the one edit a drafter should make first. Omit it for SEND.
+"defects": every defect you see (at most 6), each with a tight box in that image as fractions 0..1 of its width
+and height (x0,y0 = top-left). critical = wrong geometry the client would build on; major = must fix before
+sending; minor = cosmetic. Empty list for SEND.
 SEND = ready for the client. CAVEAT = usable, but a specific limitation must be stated. HOLD = wrong, fix before sending."""
+
+
+def parse_defects(raw, n_images):
+    """Keep well-formed defects only: known class (else "other"), known severity (else "major"),
+    image index in range, box of 4 numbers clamped to 0..1 and non-empty. Malformed entries are dropped."""
+    out = []
+    if not isinstance(raw, list):
+        return out
+    for d in raw[:6]:
+        if not isinstance(d, dict):
+            continue
+        img, box = d.get("image", 0), d.get("box")
+        if not isinstance(img, int) or isinstance(img, bool) or not 0 <= img < n_images:
+            continue
+        if not isinstance(box, list) or len(box) != 4:
+            continue
+        try:
+            x0, y0, x1, y1 = (min(max(float(v), 0.0), 1.0) for v in box)
+        except (TypeError, ValueError):
+            continue
+        x0, x1 = sorted((x0, x1))
+        y0, y1 = sorted((y0, y1))
+        if x1 - x0 < 0.005 or y1 - y0 < 0.005:
+            continue
+        cls = str(d.get("class", "")).lower().strip()
+        sev = str(d.get("severity", "")).lower().strip()
+        out.append({"class": cls if cls in DEFECT_CLASSES else "other",
+                    "severity": sev if sev in SEVERITIES else "major",
+                    "image": img, "box": [round(v, 4) for v in (x0, y0, x1, y1)]})
+    return out
 
 
 def parse_reply(text):
@@ -129,7 +167,7 @@ class MuseSparkBackend:
 
     def build_content(self, station, evidence, allowed_tools):
         tools = "\n".join(f"- {t}: {TOOLS[t]}" for t in allowed_tools) or "- (none left; you must give a verdict)"
-        content = [{"type": "input_text", "text": SYSTEM.format(tools=tools)}]
+        content = [{"type": "input_text", "text": SYSTEM.format(tools=tools, classes="|".join(DEFECT_CLASSES))}]
         for e in evidence:
             content.append({"type": "input_text", "text": e["label"]})
             if e.get("path"):

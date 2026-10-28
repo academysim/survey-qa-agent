@@ -1,7 +1,7 @@
 """Review agent: per-station loop that pulls more evidence when unsure, then frame and job roll-up."""
 import json
 
-from .backends import TOOLS
+from .backends import TOOLS, parse_defects
 from .budget import BudgetExceeded
 from .manifest import neighbours
 
@@ -46,6 +46,15 @@ def available_tools(station, manifest, evidence):
     return out
 
 
+def _conf(c):
+    """Model confidence as a float in 0..1, or None if it gave something else (e.g. "high")."""
+    try:
+        c = float(c)
+    except (TypeError, ValueError):
+        return None
+    return min(max(c, 0.0), 1.0) if c == c else None
+
+
 def review_station(station, manifest, backend, budget=None):
     evidence = initial_evidence(station)
     steps, stopped = [], None
@@ -79,11 +88,15 @@ def review_station(station, manifest, backend, budget=None):
     if "verdict" not in reply:
         reply = {"verdict": "HOLD", "confidence": 0.0, "reason": "no verdict returned", "client_note": ""}
     return {"job": station["job"], "frame": station["frame"], "station_id": station["station_id"],
-            "backend": backend.name, "verdict": reply["verdict"], "confidence": reply.get("confidence"),
+            "backend": backend.name, "verdict": reply["verdict"], "confidence": _conf(reply.get("confidence")),
             "reason": reply.get("reason", ""), "client_note": reply.get("client_note", ""),
             # Suggested edit for the drafter; only kept on a CAVEAT/HOLD and only if it is a dict.
             "fix": reply.get("fix") if reply["verdict"] != "SEND" and isinstance(reply.get("fix"), dict) else None,
             "evidence": [e["kind"] for e in evidence],
+            # Image paths in the order the model saw them, so a defect's "image" index can be resolved.
+            "images": [e["path"] for e in evidence if e.get("path")],
+            "defects": parse_defects(reply.get("defects"), sum(1 for e in evidence if e.get("path")))
+            if reply["verdict"] != "SEND" else [],
             "steps": [{"tool": s["reply"].get("tool"), "why": s["reply"].get("why"), "usage": s["usage"]}
                       for s in steps],
             "stopped": stopped,

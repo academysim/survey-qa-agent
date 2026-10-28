@@ -381,3 +381,84 @@ def test_overrun_past_dollar_cap_stops_run():
     with pytest.raises(BudgetExceeded):
         b.record_real({"input_tokens": 20000, "output_tokens": 10})
     assert b.stopped
+
+
+def test_parse_defects_clamps_and_drops_malformed():
+    from survey_qa.backends import parse_defects
+    raw = [{"class": "grass", "image": 0, "box": [0.5, 0.5, 0.5, 0.9]},  # zero width
+           {"class": "grass", "image": 0, "box": [0, 0, 1, 1, 1]},  # 5 numbers
+           {"class": "grass", "severity": "critical", "image": 0, "box": [0.9, -0.2, 0.1, 1.4]},  # swapped + clamped
+           {"class": "Canopy", "severity": "huge", "image": 1, "box": [0.1, 0.1, 0.3, 0.3]},  # severity -> major
+           {"class": "aliens", "severity": "minor", "image": 1, "box": [0.1, 0.1, 0.3, 0.3]},  # class -> other
+           {"class": "grass", "image": 2, "box": [0, 0, 1, 1]},  # image out of range
+           {"class": "grass", "image": True, "box": [0, 0, 1, 1]},  # bool is not an index
+           {"class": "grass", "image": 0, "box": [0, 0, 1]},  # 3 numbers
+           {"class": "grass", "image": 0, "box": ["a", 0, 1, 1]},  # not numbers
+           "junk"]
+    d = parse_defects(raw[:2], 2) + parse_defects(raw[2:], 2)
+    assert d == [{"class": "grass", "severity": "critical", "image": 0, "box": [0.1, 0.0, 0.9, 1.0]},
+                 {"class": "canopy", "severity": "major", "image": 1, "box": [0.1, 0.1, 0.3, 0.3]},
+                 {"class": "other", "severity": "minor", "image": 1, "box": [0.1, 0.1, 0.3, 0.3]}]
+    assert parse_defects("nope", 2) == [] and parse_defects([{"image": 0, "box": [0, 0, 1, 1]}] * 9, 1).__len__() == 6
+
+
+def test_defects_kept_on_problem_verdicts_with_image_paths():
+    dfx = [{"class": "car_jumble", "severity": "major", "image": 1, "box": [0.1, 0.2, 0.3, 0.4]}]
+    hold = review_station(man()["stations"][0], man(), Scripted([{"verdict": "HOLD", "reason": "r", "defects": dfx}]))
+    send = review_station(man()["stations"][0], man(), Scripted([{"verdict": "SEND", "reason": "r", "defects": dfx}]))
+    assert hold["defects"] == dfx and hold["images"] == ["p0.png", "a0.jpg"] and send["defects"] == []
+
+
+def test_workqueue_groups_by_model_class_worst_first():
+    from survey_qa.report import workqueue, order_key
+    rs = [{"station_id": "a", "verdict": "CAVEAT", "reason": "grass", "defects": [{"class": "grass", "severity": "minor", "image": 0, "box": [0, 0, 1, 1]}]},
+          {"station_id": "b", "verdict": "HOLD", "reason": "x", "confidence": 0.5,
+           "defects": [{"class": "grass", "severity": "critical", "image": 0, "box": [0, 0, 1, 1]}]},
+          {"station_id": "c", "verdict": "HOLD", "reason": "lines on parked cars", "confidence": 0.9, "defects": []},
+          {"station_id": "d", "verdict": "HOLD", "reason": "grass", "error": True},
+          {"station_id": "e", "verdict": "SEND", "reason": "grass"}]
+    q = workqueue(rs)
+    assert [(x["class"], x["stations"]) for x in q] == [("grass", ["b", "a"]), ("car_jumble", ["c"])]
+    assert sorted(rs[:3], key=order_key)[0]["station_id"] == "b"  # critical beats higher confidence
+
+
+def test_trace_evidence_appears_at_the_turn_that_asked_for_it():
+    from survey_qa.trace import station_trace
+    u = {"input_tokens": 1, "output_tokens": 1}
+    r = {"station_id": "f0_sta00000", "verdict": "HOLD", "confidence": 0.9, "reason": "r", "fix": None,
+         "evidence": ["plan", "photo", "second_photo", "qa_flags"], "images": ["p.png", "a.jpg", "b.jpg"],
+         "defects": [{"class": "grass", "severity": "major", "image": 2, "box": [0, 0, .5, .5]}],
+         "steps": [{"tool": "second_photo", "why": "w", "usage": u}, {"tool": "qa_flags", "why": "w", "usage": u},
+                   {"tool": None, "why": None, "usage": u}]}
+    t = station_trace(r, {"qa_flags": {"bins": 1}})
+    assert len(t["turns"]) == 3 and [e["at"] for e in t["ev"]] == [0, 0, 1, 2]
+    assert [len(e.get("boxes", [])) for e in t["ev"]] == [0, 0, 1, 0]
+
+
+def test_saved_results_normalized_and_render_without_drafts(tmp_path, monkeypatch):
+    from survey_qa import report, trace
+    monkeypatch.setattr(report, "build", lambda job: (_ for _ in ()).throw(FileNotFoundError(job)))
+    bad = [{"job": "j", "frame": "f0", "station_id": "f0_sta00000", "verdict": "HOLD", "confidence": "high",
+            "evidence": None, "steps": None, "defects": [{"class": "x", "severity": "y", "image": 0, "box": [0, 0, 1, 1]}],
+            "images": ["missing.png"], "reason": "<script>x</script>"},
+           {"job": "j", "frame": "f0", "station_id": "f0_sta00250", "verdict": "SEND", "confidence": 0.8}]
+    out = report.render(bad, str(tmp_path / "r.html"))
+    trace.render(bad, str(tmp_path / "t.html"))
+    html = open(out, encoding="utf-8").read()
+    assert "<script>x" not in html and "image unavailable" in html
+    n = report.normalize_result(bad[0])
+    assert n["confidence"] is None and n["defects"][0]["class"] == "other" and n["defects"][0]["severity"] == "major"
+
+
+def test_trace_timing_with_no_plan():
+    from survey_qa.trace import station_trace
+    u = {"input_tokens": 1, "output_tokens": 1}
+    r = {"station_id": "s", "verdict": "HOLD", "confidence": 0.5, "reason": "r", "fix": None,
+         "evidence": ["photo", "qa_flags"], "images": ["a.jpg"], "defects": [],
+         "steps": [{"tool": "qa_flags", "why": "w", "usage": u}, {"tool": None, "why": None, "usage": u}]}
+    assert [e["at"] for e in station_trace(r, {})["ev"]] == [0, 1]
+
+
+def test_confidence_coerced():
+    from survey_qa.agent import _conf
+    assert _conf("high") is None and _conf("0.7") == 0.7 and _conf(3) == 1.0 and _conf(float("nan")) is None
