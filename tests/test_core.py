@@ -373,3 +373,11 @@ def test_overrun_past_cap_stops_run():
     assert b.stopped
     with pytest.raises(BudgetExceeded):
         b.check(1, 0)
+
+
+def test_overrun_past_dollar_cap_stops_run():
+    b = Budget(max_tokens=10**9, max_usd=0.01, usd_per_m_in=1.0, usd_per_m_out=1.0)
+    b.check(1, 0)
+    with pytest.raises(BudgetExceeded):
+        b.record_real({"input_tokens": 20000, "output_tokens": 10})
+    assert b.stopped

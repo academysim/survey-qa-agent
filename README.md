@@ -25,7 +25,7 @@ Set `SURVEY_QA_DRAFTS` to that folder. Without it, `run.py` has nothing to revie
 
 `--backend muse` refuses to start without `--max-tokens`. Before every call it estimates the cost and
 stops if the call could go past the cap. Token estimates are padded guesses, so one call can still
-run over its reservation; the ledger logs that as an overrun and the run stops at once if the cap was passed. A `--max-usd` cap also needs `--usd-in/--usd-out` prices.
+run over its reservation; the ledger logs that as an overrun and the run stops at once if the token or dollar cap was passed. A `--max-usd` cap also needs `--usd-in/--usd-out` prices.
 Each run writes `runs/<job>_<backend>_<time>/` containing `results.jsonl` (written as it goes), `run.json`
 and `viewer.html`.
 
@@ -69,7 +69,9 @@ re-checked the heldout1 "false alarms" and says those stations were also missing
 defects. Prompt v4 (parking stops, partly drawn crosswalks and gores, no flow line where asphalt meets the curb
 face) was written AFTER heldout2 was scored, so v4 has no clean held-out number yet.
 
-### Full held-out jobs, prompt v4 (no frame labels; volume and cost only)
+### Full jobs, prompt v4 (no frame labels; volume and cost only)
+These are the same four jobs heldout1 was sampled from, and heldout1's notes shaped the checklist, so they are not
+held out for v4.
 
 | Job | Stations | HOLD / CAVEAT / SEND | Errors |
 |---|---|---|---|

@@ -89,6 +89,9 @@ class Budget:
         if self.used_in + self.used_out > self.max_tokens:
             raise self.stop(f"token cap {self.max_tokens} passed by a call larger than its reservation: "
                             f"used {self.used_in + self.used_out}")
+        if self.max_usd is not None and self.spent_usd > self.max_usd:
+            raise self.stop(f"dollar cap ${self.max_usd} passed by a call larger than its reservation: "
+                            f"spent ${self.spent_usd:.4f}")
 
     def record_failed(self):
         """A request that errored or timed out may still be billed: charge the estimate."""

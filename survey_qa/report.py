@@ -72,9 +72,9 @@ def render(results, out, job=None):
          f"<div class=mut>{len(results)} stations reviewed by {esc(results[0]['backend'])} · "
          f"generated {time.strftime('%Y-%m-%d %H:%M')} · machine review, a surveyor signs off</div>",
          "<div class=tiles>" + "".join(f"<div class=tile><div class=big>{counts[v]}</div>{badge(v)} frames</div>"
-                                       for v in ("SEND", "CAVEAT", "HOLD") ) + "</div>"]
+                                       for v in ("SEND", "CAVEAT", "HOLD", "UNASSESSED") if v != "UNASSESSED" or counts[v]) + "</div>"]
     if counts["UNASSESSED"] or partial:
-        p.append(f"<p class=mut>Not assessed: {counts['UNASSESSED']} frame(s) with a review error; "
+        p.append(f"<p class=mut>Not assessed: {counts['UNASSESSED']} frame(s) with a review error or not fully reviewed; "
                  f"partly reviewed: {', '.join(partial) or 'none'}.</p>")
     p.append("<h2>Frames</h2><table><tr><th>Frame</th><th>Verdict</th><th>Stations S/C/H</th><th>Client note</th></tr>")
     for f in frames:
